@@ -1,0 +1,545 @@
+---
+title: "Analysis for producing a new model for GFR"
+author: "Edward Williams"
+date: "4 October 2016"
+output: pdf_document
+---
+
+## Loading data and packages
+
+```{r Load_functions_for_analysis, include=FALSE}
+# Librarys and R scripts needed for analysis
+source("Functions_publication.R")         # Generic Function  
+source("Clean_data_publication.R")        # Data for analysis, loads and cleans data
+source("ggplot_functions.R")              # Functions used to produce plots 
+
+library(dplyr)
+library(ggplot2)
+library(ggExtra)
+library(gridExtra)
+library(MASS)
+library(scales)
+library(fitdistrplus)
+library(knitr)
+library(highlight)
+
+```
+
+
+```{r Set_defult_chunk_options, include=FALSE}
+# Set global chunk options
+opts_chunk$set(cache=TRUE, tidy=TRUE, autodep=TRUE, echo=FALSE, 
+                tidy.opts=list(width.cutoff=60), comment=NA)
+options(width=80)
+```
+
+## Exploritary analysis
+
+```{r Exploritary_plots, echo=FALSE, fig.height=5}
+pt = .5
+
+p1 <- thedata_dev %>% mutate(index=c(1:dim(thedata_dev)[1])) %>%
+  ggplot(aes(x=GFR, y=index)) + geom_point(size=pt, alpha=.3, stroke=0) + my_theme() 
+p1 <- ggMarginal(p1, type = "histogram", margins = "x", bins=30) 
+
+p2 <- thedata_dev %>% mutate(index=c(1:dim(thedata_dev)[1])) %>%
+  ggplot(aes(x=Creat, y=index)) + geom_point(size=pt, alpha=.3, stroke=0) + my_theme() 
+p2 <- ggMarginal(p2, type = "histogram", margins = "x", bins=30) 
+
+p3 <- thedata_dev %>% mutate(index=c(1:dim(thedata_dev)[1])) %>%
+  ggplot(aes(x=Age, y=index)) + geom_point(size=pt, alpha=.3, stroke=0) + my_theme() 
+p3 <- ggMarginal(p3, type = "histogram", margins = "x", bins=30) 
+
+p4 <- thedata_dev %>% mutate(index=c(1:dim(thedata_dev)[1])) %>%
+  ggplot(aes(x=SufA, y=index)) + geom_point(size=pt, alpha=.3, stroke=0) + my_theme() 
+p4 <- ggMarginal(p4, type = "histogram", margins = "x", bins=30) 
+
+p5 <- thedata_dev %>% mutate(index=c(1:dim(thedata_dev)[1])) %>%
+  ggplot(aes(x=Ht, y=index)) + geom_point(size=pt, alpha=.3, stroke=0) + my_theme() 
+p5 <- ggMarginal(p5, type = "histogram", margins = "x", bins=30) 
+
+p6 <- thedata_dev %>% mutate(index=c(1:dim(thedata_dev)[1])) %>%
+  ggplot(aes(x=Wt, y=index)) + geom_point(size=pt, alpha=.3, stroke=0) + my_theme() 
+p6 <- ggMarginal(p6, type = "histogram", margins = "x", bins=30) 
+
+grid.arrange(p1,p2,p3,p4,p5,p6, ncol=2)
+
+p1 <- thedata_dev %>%
+  ggplot(aes(x=Creat, y=GFR, colour=Sex)) + geom_point(size=pt, alpha=.3, stroke=0) + 
+  my_theme() + stat_smooth(method="loess", span=.9, size=pt) 
+legend <- g_legend(p1) 
+p1 <- p1 + theme(legend.position="none")
+p2 <- thedata_dev %>%
+  ggplot(aes(x=Age, y=GFR, colour=Sex)) + geom_point(size=pt, alpha=.3, stroke=0) + 
+  my_theme() + stat_smooth(method="loess", span=.9, size=pt) + theme(legend.position="none")
+p3 <- thedata_dev %>%
+  ggplot(aes(x=SufA, y=GFR, colour=Sex)) + geom_point(size=pt, alpha=.3, stroke=0) + 
+  my_theme() + stat_smooth(method="loess", span=.9, size=pt) + theme(legend.position="none")
+p4 <- thedata_dev %>% 
+  ggplot(aes(x=Ht, y=GFR, colour=Sex)) + geom_point(size=pt, alpha=.3, stroke=0) + 
+  my_theme() + stat_smooth(method="loess", span=.9, size=pt) + theme(legend.position="none")
+p5 <- thedata_dev %>%
+  ggplot(aes(x=Wt, y=GFR, colour=Sex)) + geom_point(size=pt, alpha=.3, stroke=0) + 
+  my_theme() + stat_smooth(method="loess", span=.9, size=pt) + theme(legend.position="none")
+grid.arrange(p1,p2,p3,p4,p5,legend, ncol=2)
+```
+
+
+```{r Exploritary_plots_2, fig.height=3.33}
+p1 <- thedata_dev %>%
+  ggplot(aes(x=Age, y=Creat, colour=Sex)) + geom_point(size=pt, alpha=.3, stroke=0) + 
+  my_theme() + stat_smooth(method="loess", span=.9, size=pt) 
+legend <- g_legend(p1) 
+p1 <- p1 + theme(legend.position="none")
+p2 <- thedata_dev %>%
+  ggplot(aes(x=SufA, y=Creat, colour=Sex)) + geom_point(size=pt, alpha=.3, stroke=0) + 
+  my_theme() + stat_smooth(method="loess", span=.9, size=pt) + theme(legend.position="none")
+p3 <- thedata_dev %>%
+  ggplot(aes(x=Ht, y=Creat, colour=Sex)) + geom_point(size=pt, alpha=.3, stroke=0) + 
+  my_theme() + stat_smooth(method="loess", span=.9, size=pt) + theme(legend.position="none")
+p4 <- thedata_dev %>% 
+  ggplot(aes(x=Wt, y=Creat, colour=Sex)) + geom_point(size=pt, alpha=.3, stroke=0) + 
+  my_theme() + stat_smooth(method="loess", span=.9, size=pt) + theme(legend.position="none")
+
+grid.arrange(p1,p2,p3,p4, ncol=2)
+```
+
+
+## Comparing published models
+
+
+```{r Published_model_comparison, size='tiny'}
+source("Table_for_paper_new_publication.R", echo=F)
+
+Fitted_vals <- GFR_fitted_values(thedata_full)
+equations <- c(Median_estimate, RMSE, Resid_med, resid_IQR, PE, APE, APE_under20)
+
+Statistics_table <- sapply(equations, function(x) 
+  apply_func_to_fitted_vals(x, thedata_full$GFR, Fitted_vals))
+Statistics_table_under60 <- sapply(equations, function(x) 
+  apply_func_to_fitted_vals_under60(x, thedata_full$GFR, Fitted_vals))
+Statistics_table_more60 <- sapply(equations, function(x) 
+  apply_func_to_fitted_vals_60more(x, thedata_full$GFR, Fitted_vals))
+colnames(Statistics_table) <- colnames(Statistics_table_under60) <- 
+  colnames(Statistics_table_more60) <- 
+  c("GFR measurmet", "RMSE", "Residual Median", "Residual IQR", "PE", "APE", "APE under 20%")
+
+Statistics_table
+Statistics_table_under60
+Statistics_table_more60
+
+Statistics_table_dose <- sapply(equations, function(x) 
+  apply_func_to_fitted_vals(x, thedata_full$GFR, Fitted_vals, Dose=T))
+Statistics_table_under60_dose <- sapply(equations, function(x) 
+  apply_func_to_fitted_vals_under60(x, thedata_full$GFR, Fitted_vals, Dose=T))
+Statistics_table_more60_dose <- sapply(equations, function(x) 
+  apply_func_to_fitted_vals_60more(x, thedata_full$GFR, Fitted_vals, Dose=T))
+colnames(Statistics_table_dose) <- colnames(Statistics_table_under60_dose) <- 
+  colnames(Statistics_table_more60_dose) <- 
+  c("GFR measurmet", "RMSE", "Residual Median", "Residual IQR", "PE", "APE", "APE under 20%")
+
+Statistics_table_dose
+Statistics_table_under60_dose
+Statistics_table_more60_dose
+```
+
+
+
+## Box Cox transformation 
+
+
+````{r Box_Cox, warning=FALSE, fig.height=1.67}
+Simple_model <- lm(GFR ~  ., data = thedata_dev)
+bc <- boxcox(Simple_model,lambda = seq(0.2, 0.8, 1/1000), plotit = F)
+
+bc <- as.data.frame(bc)
+lambda_max <- bc$x[which.max(bc$y)]
+Interval.x <- bc$x[which(bc$y-max(bc$y)+0.5*qchisq(0.95,1)>0)]
+Interval.y <- bc$y[which(bc$y-max(bc$y)+0.5*qchisq(0.95,1)>0)]
+
+pt=.5; lty=3
+p1 <- ggplot(bc, aes(x=x, y=y)) + geom_line(size=pt) + 
+  geom_segment(x=lambda_max, xend=lambda_max, y=max(bc$y), yend=min(bc$y), linetype=lty,size=pt) + 
+  geom_segment(x=Interval.x[1], xend=Interval.x[1], y=Interval.y[1], yend=min(bc$y), 
+               linetype=lty, size=pt) + 
+  geom_segment(x=Interval.x[length(Interval.x)], xend=Interval.x[length(Interval.x)],
+               y=Interval.y[1], yend=min(bc$y), linetype=lty, size=pt) + 
+  geom_line(y = Interval.y[1], linetype=lty, size=pt) + 
+  ylab("log-Likelihood") + my_theme() + xlab(expression(lambda)) +
+  geom_text(x=min(bc$x), y=Interval.y[1], label="95%", hjust=-0.1, vjust=-0.1) 
+
+p2 <- ggQQ(sqrt(thedata_dev$GFR), size=pt*2, alpha=.3, stroke=0) + my_theme()
+grid.arrange(p1,p2, ncol=2)
+
+# Maximum likelihood estimate 
+lambda_max <- round(lambda_max, 3) 
+lambda_CI <- round(Interval.x[c(1, length(Interval.x))],3)
+paste0(lambda_max, " (", lambda_CI[1],", ",lambda_CI[2], ")")
+
+# fn <- fitdist(sqrt(thedata_dev$GFR), "norm")
+# plot.legend <- c("Normal")
+# qqcomp(fn, legendtext = plot.legend, fitpch=c(16), 
+#        fitcol = alpha(gg_color_hue(1), 0.6), xlab = "Theoretical quantiles")
+```
+
+```{r GFR_transformation_plots, echo=FALSE, fig.height=1.67}
+p1 <- thedata_dev %>% 
+  ggplot(aes(x=GFR)) + geom_histogram(aes(y=..density..), fill="grey", colour="black", bins = 25) + 
+  stat_function(fun=dnorm, args = list(mean=mean(thedata_dev$GFR), sd=sd(thedata_dev$GFR)),
+                aes(colour="Normal dencity")) +
+  stat_density(aes(colour="Gausian kernal dencity"), geom="line") + my_theme() +
+  theme(legend.position="bottom")
+legend <- g_legend(p1) 
+p1 <- p1 + theme(legend.position="none")
+p2 <- thedata_dev %>% mutate(GFR=sqrt(GFR)) %>%
+  ggplot(aes(x=GFR)) + geom_histogram(aes(y=..density..), fill="grey", colour="black", bins = 25) + Faulty iWorld Gamma wireless Earbuds
+  stat_function(fun=dnorm, args = list(mean=mean(sqrt(thedata_dev$GFR)), sd=sd(sqrt(thedata_dev$GFR))),
+                aes(colour="Normal dencity")) +
+  stat_density(aes(colour="Gausian kernal dencity"), geom="line") + my_theme() + 
+  xlab(expression(paste(sqrt("GFR")))) + theme(legend.position="none")
+
+library(grid)
+grid.arrange(arrangeGrob(p1,p2, ncol=2),legend, ncol=1, heights= c(10,1))
+```
+
+
+```{r create_new_dataframe}
+# defining new datasets which include the square root transformed GFR
+transdata_dev <- thedata_dev %>% mutate(GFR=sqrt(GFR)) 
+transdata_full <- thedat~a_full %>% mutate(GFR=sqrt(GFR)) 
+```
+
+## Transforming predicting variables
+
+
+```{r Creat_transfrormation_analysis, echo=FALSE, fig.height=4}
+pt = .5
+
+df <- transdata_dev
+Simple_model <- lm(GFR ~  ., data = df)
+r <- Simple_model$residuals
+p1 <- df %>% mutate(residuals=r) %>% 
+  ggplot(aes(x=Creat, y=residuals, colour=Sex)) + geom_point(alpha=.3, stroke=0, size=pt) + 
+  stat_smooth(method="loess", size=pt) + my_theme() + theme(legend.position="none")
+
+df <- transdata_dev %>% mutate(log_Creat=log(Creat)) %>% 
+  dplyr::select(-Creat)
+Simple_model <- lm(GFR ~  ., data = df)
+r <- Simple_model$residuals
+p2 <- df %>% mutate(residuals=r) %>% 
+  ggplot(aes(x=log_Creat, y=residuals, colour=Sex)) + geom_point(alpha=.3, stroke=0, size=pt) + 
+  stat_smooth(method="loess", size=pt) + my_theme() + theme(legend.position="none") + ggtitle("Simple model +  log(Scr)")
+
+df <- transdata_dev %>% mutate(log_Creat=log(Creat)) %>% 
+  dplyr::select(-Creat)
+Simple_model <- lm(GFR ~  . + I(log_Creat^2), data = df)
+r <- Simple_model$residuals
+p3 <- df %>% mutate(residuals=r) %>% 
+  ggplot(aes(x=log_Creat, y=residuals, colour=Sex)) + geom_point(alpha=.3, stroke=0, size=pt) + 
+  stat_smooth(method="loess", size=pt) + my_theme() + theme(legend.position="none") + ggtitle("Simple model + log(Scr) + log(Scr)^2")
+
+df <- transdata_dev %>% mutate(log_Creat=log(Creat)) %>% 
+  dplyr::select(-Creat) 
+Simple_model <- lm(GFR ~  . + I(log_Creat^2)  + I(log_Creat^3), data = df)
+r <- Simple_model$residuals
+p4 <- df %>% mutate(residuals=r) %>% 
+  ggplot(aes(x=log_Creat, y=residuals, colour=Sex)) + geom_point(alpha=.3, stroke=0, size=pt) + 
+  stat_smooth(method="loess", size=pt) + my_theme() + theme(legend.position="none") + ggtitle("Simple model + log(Scr) + log(Scr)^2 + log(Scr)^3")
+
+grid.arrange(p1,p2,p3,p4)
+```
+
+```{r Edit_dataframes}
+transdata_dev <- thedata_dev %>% mutate(GFR=sqrt(GFR)) %>%
+  mutate(log_Creat=log(Creat)) %>% dplyr::select(-Creat)
+transdata_full <- thedata_full %>% mutate(GFR=sqrt(GFR)) %>% 
+  mutate(log_Creat=log(Creat)) %>% dplyr::select(-Creat) 
+thedata_val <- thedata_val %>% mutate(log_Creat=log(Creat))
+```
+
+
+```{r F-test_Creat}
+Simple_model <- lm(GFR ~  ., data = transdata_dev)
+New_model <- lm(GFR ~  . + I(log_Creat^2)  + I(log_Creat^3), data = transdata_dev)
+anova(Simple_model, New_model)
+```
+
+
+```{r Other_varable_transformation_analysis, echo=FALSE, fig.height=4}
+pt = .5
+
+df <- transdata_dev
+Simple_model <- lm(GFR ~  ., data = df)
+r <- Simple_model$residuals
+p1 <- df %>% mutate(residuals=r) %>% 
+  ggplot(aes(x=Age, y=residuals, colour=Sex)) + geom_point(alpha=.3, stroke=0, size=pt) + 
+  stat_smooth(method="loess", size=pt) + my_theme() + theme(legend.position="none")
+
+df <- transdata_dev
+Simple_model <- lm(GFR ~  ., data = df)
+r <- Simple_model$residuals
+p2 <- df %>% mutate(residuals=r) %>% 
+  ggplot(aes(x=SufA, y=residuals, colour=Sex)) + geom_point(alpha=.3, stroke=0, size=pt) + 
+  stat_smooth(method="loess", size=pt) + my_theme() + theme(legend.position="none")
+
+df <- transdata_dev
+Simple_model <- lm(GFR ~  ., data = df)
+r <- Simple_model$residuals
+p3 <- df %>% mutate(residuals=r) %>% 
+  ggplot(aes(x=Wt, y=residuals, colour=Sex)) + geom_point(alpha=.3, stroke=0, size=pt) + 
+  stat_smooth(method="loess", size=pt) + my_theme() + theme(legend.position="none")
+
+df <- transdata_dev
+Simple_model <- lm(GFR ~  ., data = df)
+r <- Simple_model$residuals
+p4 <- df %>% mutate(residuals=r) %>% 
+  ggplot(aes(x=Ht, y=residuals, colour=Sex)) + geom_point(alpha=.3, stroke=0, size=pt) + 
+  stat_smooth(method="loess", size=pt) + my_theme() + theme(legend.position="none")
+
+grid.arrange(p1,p2,p3,p4)
+```
+
+
+## Finding variables for final model
+
+```{r Setup_full_null_models}
+full <- glm(GFR ~ .*. + I(log_Creat^2) + I(log_Creat^3), data = transdata_dev, 
+            family = gaussian(link = 'identity'), x=T, y=T)
+null <- glm(GFR ~ 1, data = transdata_dev, 
+            family = gaussian(link = 'identity'), x=T, y=T)
+```
+
+
+```{r running_BIC_step}
+n <- dim(thedata_dev)[1]
+step(null, scope = list(lower=null, upper=full), k =log(n), trace=F)
+BIC_model <- step(null, scope = list(lower=null, upper=full), k =log(n), trace=F)
+```
+
+
+```{r running_lon_step, eval=FALSE} 
+source('Functions_for_step_cross_selection_lo1_lon.R', echo=FALSE)
+source("Table_list_glm_function.R", echo=FALSE)
+
+n <- 2000
+models <- list()
+set.seed(1234)
+for(i in 1:n){
+  seed = sample(1:1000000, 1)
+  models[[i]] <- RMSE_step(simple, direction = "both", 
+                           scope=list(lower=simple, upper=full), 
+                           seed=seed, 
+                           frac_improv = .999 , trace=1, CV = "lon")
+}
+table_models <- Table_list_glm(models)
+save(table_models, "table_models.RData")
+```
+
+```{r Running_lo1_step}
+source('Functions_for_step_cross_selection_lo1_lon.R', echo=FALSE)
+Leave_out_one_model <- RMSE_step(simple1, direction = "both", 
+                           scope=list(lower=simple1, upper=full), 
+                           frac_improv = .999 , trace=1, CV = "lo1")
+```
+
+
+
+```{r New_models}
+load("table_models.Rdata")
+Leave_out_n_model <- table_models[[1]]$model
+Leave_out_n_model
+New_model <- BIC_model 
+```
+
+```{r analysie_residuals_new_model, echo=FALSE}
+pt = .5
+
+df <- thedata_val
+fit <- predict(New_model, newdata = df, type = "response") 
+r <- sqrt(df$GFR) - fit
+p1 <- df %>% mutate(residuals=r) %>% 
+  ggplot(aes(x=log_Creat, y=residuals)) + geom_point(aes(colour=Sex), alpha=.3, stroke=0, size=pt) + 
+  stat_smooth(method="loess", size=pt, colour="black") + my_theme() + theme(legend.position="none")
+
+p2 <- df %>% mutate(residuals=r) %>% 
+  ggplot(aes(x=Age, y=residuals)) + geom_point(aes(colour=Sex), alpha=.3, stroke=0, size=pt) + 
+  stat_smooth(method="loess", size=pt, colour="black") + my_theme() + theme(legend.position="none")
+
+p3 <- df %>% mutate(residuals=r) %>% 
+  ggplot(aes(x=SufA, y=residuals)) + geom_point(aes(colour=Sex), alpha=.3, stroke=0, size=pt) + 
+  stat_smooth(method="loess", size=pt, colour="black") + my_theme() + theme(legend.position="none")
+
+
+p4 <- df %>% mutate(residuals=r) %>% mutate(fitted=fit) %>%
+  ggplot(aes(x=fitted, y=residuals)) + geom_point(aes(colour=Sex), alpha=.3, stroke=0, size=pt) + 
+  stat_smooth(method="loess", size=pt, colour="black") + my_theme() + theme(legend.position="none")
+
+grid.arrange(p1,p2,p3,p4)
+```
+
+## Comparing new model to published models
+
+```{r Compare_new_model, size='tiny'}
+source("Table_for_paper_new_publication.R", echo=F)
+
+New_model_fitted_val <- predict(New_model, newdata=thedata_val, type="response")^2
+Fitted_vals <- cbind(New_model_fitted_val, GFR_fitted_values(thedata_val))
+
+equations <- c(Median_estimate, RMSE, Resid_med, resid_IQR, PE, APE, APE_under20)
+
+Statistics_table <- sapply(equations, function(x) apply_func_to_fitted_vals(x, thedata_val$GFR, Fitted_vals))
+Statistics_table_under60 <- sapply(equations, function(x) apply_func_to_fitted_vals_under60(x, thedata_val$GFR, Fitted_vals))
+Statistics_table_more60 <- sapply(equations, function(x) apply_func_to_fitted_vals_60more(x, thedata_val$GFR, Fitted_vals))
+colnames(Statistics_table) <- colnames(Statistics_table_under60) <- 
+  colnames(Statistics_table_more60) <- 
+  c("GFR measurmet", "RMSE", "Residual Median", "Residual IQR", "PE", "APE", "APE under 20%")
+
+Statistics_table
+Statistics_table_under60
+Statistics_table_more60
+
+Statistics_table_dose <- sapply(equations, function(x) apply_func_to_fitted_vals(x, thedata_val$GFR, Fitted_vals, Dose=T))
+Statistics_table_under60_dose <- sapply(equations, function(x) apply_func_to_fitted_vals_under60(x, thedata_val$GFR, Fitted_vals, Dose=T))
+Statistics_table_more60_dose <- sapply(equations, function(x) apply_func_to_fitted_vals_60more(x, thedata_val$GFR, Fitted_vals, Dose=T))
+colnames(Statistics_table_dose) <- colnames(Statistics_table_under60_dose) <- 
+  colnames(Statistics_table_more60_dose) <- 
+  c("GFR measurmet", "RMSE", "Residual Median", "Residual IQR", "PE", "APE", "APE under 20%")
+
+Statistics_table_dose
+Statistics_table_under60_dose
+Statistics_table_more60_dose
+
+MAIN = rbind(Statistics_table_dose[order(Statistics_table[,2], decreasing = T),], Statistics_table_under60_dose[order(Statistics_table[,2], decreasing = T),], Statistics_table_more60_dose[order(Statistics_table[,2], decreasing = T),])
+write.xlsx(MAIN, file="/Users/willia01/Desktop/mydata2.xlsx")
+```
+
+
+## Infestigating dependance of model on data partition
+
+
+```{r Development_split_infestigation, eval=FALSE}
+source("Development_split_infestigation_all_publication.R")
+```
+
+
+```{r, echo=FALSE}
+load("Different_splits_5fold_models.RData")
+load("Different_splits_leaveoutone_models.RData")
+load("Different_splits_BIC_models.RData")
+
+freq_table_func <- function(models){
+  coeficients <- lapply(models, function(x) names(x$coef) )
+  
+  vvv <- unique(unlist(coeficients))
+  coef_mat <- matrix(NA, nrow=length(coeficients), ncol=length(vvv))
+  for(i in 1:length(coeficients)){
+    coef_mat[i,] <- vvv %in% coeficients[[i]]
+  }
+  colnames(coef_mat) <- vvv
+  
+  coef_mat <- coef_mat[,-c(1:7)]
+  
+  mm <- mgcv::uniquecombs(coef_mat)
+  class(mm)
+  ind <- attr(mm,"index")
+  table(ind)
+  
+  df <- data.frame(mm)
+  colnames(df) <- vvv[-c(1:7)]
+  df$freq <- table(ind)
+  df[order(df$freq, decreasing = T),]
+}
+
+freq_table_func(models_BIC)
+freq_table_func(models_5_fold)
+freq_table_func(models_leave_one_out)
+```
+
+## Comparing final model to published model on external dataset 
+
+```{r}
+New_model_final <- update(New_model, data=transdata_full)
+```
+
+```{r}
+CleanGlasgowData <- CleanGlasgowData %>%  mutate(log_Creat=log(Creat))  
+
+New_model_final_fit_val <- predict(New_model_final, newdata=CleanGlasgowData, type="response")^2
+Fitted_vals_glasgow <- cbind(New_model_final_fit_val, GFR_fitted_values(CleanGlasgowData))
+
+equations <- c(Median_estimate, RMSE, Resid_med, resid_IQR, PE, APE, APE_under20)
+
+Statistics_table_glasgow <- sapply(equations, function(x) apply_func_to_fitted_vals(x, CleanGlasgowData$GFR, Fitted_vals_glasgow))
+Statistics_table_glasgow_dose <- sapply(equations, function(x) apply_func_to_fitted_vals(x, CleanGlasgowData$GFR, Fitted_vals_glasgow, Dose=T))
+
+
+colnames(Statistics_table_glasgow) <- colnames(Statistics_table_glasgow_dose) <-
+  c("GFR measurmet", "RMSE", "Residual Median", "Residual IQR", "PE", "APE", "APE under 20%")
+
+Statistics_table_glasgow
+Statistics_table_glasgow_dose
+```
+
+
+```{r}
+.smooth <- function(x, y) {
+  stats::lowess(x, y, f = 2/3, iter = 3)
+}
+
+
+
+plot.data <- fortify(New_model_final)
+plot.data$.index <- 1:dim(plot.data)[1]
+plot.data$.label <- rownames(plot.data)
+
+r <- New_model_final$residuals
+n <- length(r)
+pp <- length(New_model_final$coefficients)
+mse <- sum(r^2)/(n-pp)
+
+
+cook_dist_function <- function(x, ckd=.5){
+  y = sqrt(ckd*mse*pp*(1-x)^2/x)
+  y
+}
+cook_dist_function_neg <- function(x, ckd=.5){
+  y = sqrt(ckd*mse*pp*(1-x)^2/x)
+  -y
+}
+
+mh <- max(plot.data$.hat)
+mh = mh
+
+
+smoother <- .smooth(plot.data$.hat, plot.data$.stdresid)
+p1 <- ggplot(plot.data, aes(x = .hat, y = .stdresid)) + 
+  geom_point(size = pt, alpha =al, stroke=0 ) +
+#   geom_path(x = smoother$x, y = smoother$y, colour = "#0000FF") + 
+  xlab("Leverage") +ylab("Standardised residuals") + 
+  stat_function(fun=cook_dist_function, aes(linetype="Cook's Distance"), colour ="red", size=lt) + 
+  stat_function(fun=cook_dist_function_neg, aes(linetype="Cook's Distance"), colour ="red", size=lt) + 
+  ylim(c(-max(abs(plot.data$.stdresid)), max(abs(plot.data$.stdresid)))) + 
+  my_theme() +  scale_linetype_manual(values = c("dashed"), name=NULL,
+                                      labels = c("Cook's Distance 0.5"),guide="legend") + 
+  theme(legend.justification = c(1, 0), legend.position = c(1, 0), legend.key = element_blank())
+
+
+p2 <- ggplot(plot.data, aes(x=.index, y=.cooksd, ymin=0, ymax=.cooksd)) + 
+  geom_linerange() + 
+  xlab("Sample number") + ylab("Cook's distance") + 
+  my_theme()
+
+
+
+
+smoother <- .smooth(plot.data$.fitted, sqrt(abs(plot.data$.stdresid)))
+p3 <- ggplot(plot.data, aes(x=.fitted, y=sqrt(abs(.stdresid)))) + 
+  geom_point(size = pt, alpha =al, stroke=0) + 
+  geom_line(stat="smooth", method = "loess", size=lt*2,  colour = "white", span=sp+0.1) + 
+  geom_line(stat="smooth", method = "loess", size=lt,  colour = "#0000FF", span=sp+0.1) + 
+#   geom_path(x = smoother$x, y = smoother$y, colour = "#0000FF", size=lt) + 
+  xlab("Fitted values") + ylab(expression(sqrt(abs(`Standardised residuals`)))) + 
+  my_theme()
+
+grid.arrange(p1,p2,p3, ncol=2)
+```
